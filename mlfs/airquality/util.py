@@ -288,10 +288,64 @@ def check_file_path(file_path):
         print(f"File successfully found at the path: {file_path}")
 
 def backfill_predictions_for_monitoring(weather_fg, air_quality_df, monitor_fg, model):
+    import datetime as dt
     features_df = weather_fg.read()
     features_df = features_df.sort_values(by=['date'], ascending=True)
     features_df = features_df.tail(10)
-    features_df['predicted_pm25'] = model.predict(features_df[['temperature_2m_mean', 'precipitation_sum', 'wind_speed_10m_max', 'wind_direction_10m_dominant']])
+    
+    # Ensure dates are in datetime format
+    features_df['date'] = pd.to_datetime(features_df['date'])
+    air_quality_df['date'] = pd.to_datetime(air_quality_df['date'])
+    
+    # Get historical PM2.5 data sorted by date for lag computation
+    historical_pm25 = air_quality_df[['date', 'pm25']].sort_values('date').copy()
+    
+    # Initialize lag feature columns
+    features_df['pm25_lag_1'] = 0.0
+    features_df['pm25_lag_2'] = 0.0
+    features_df['pm25_lag_3'] = 0.0
+    features_df['pm25_roll_3'] = 0.0
+    
+    # Compute lag features for each date
+    for idx, pred_date in enumerate(features_df['date']):
+        lag_1_date = pred_date - dt.timedelta(days=1)
+        lag_2_date = pred_date - dt.timedelta(days=2)
+        lag_3_date = pred_date - dt.timedelta(days=3)
+        
+        # Look up PM2.5 values from historical data
+        lag_1_val = historical_pm25[historical_pm25['date'] == lag_1_date]['pm25'].values
+        lag_2_val = historical_pm25[historical_pm25['date'] == lag_2_date]['pm25'].values
+        lag_3_val = historical_pm25[historical_pm25['date'] == lag_3_date]['pm25'].values
+        
+        # Set lag values (use 0.0 if historical data not available)
+        features_df.at[features_df.index[idx], 'pm25_lag_1'] = lag_1_val[0] if len(lag_1_val) > 0 else 0.0
+        features_df.at[features_df.index[idx], 'pm25_lag_2'] = lag_2_val[0] if len(lag_2_val) > 0 else 0.0
+        features_df.at[features_df.index[idx], 'pm25_lag_3'] = lag_3_val[0] if len(lag_3_val) > 0 else 0.0
+        
+        # Compute rolling 3-day mean
+        lag_values = [
+            features_df.at[features_df.index[idx], 'pm25_lag_1'],
+            features_df.at[features_df.index[idx], 'pm25_lag_2'],
+            features_df.at[features_df.index[idx], 'pm25_lag_3']
+        ]
+        non_zero_values = [v for v in lag_values if v != 0.0]
+        if len(non_zero_values) > 0:
+            features_df.at[features_df.index[idx], 'pm25_roll_3'] = sum(non_zero_values) / len(non_zero_values)
+        else:
+            features_df.at[features_df.index[idx], 'pm25_roll_3'] = 0.0
+    
+    # Predict with all features (lag features first, then weather features - matching training order)
+    feature_cols = [
+        'pm25_lag_1',
+        'pm25_lag_2',
+        'pm25_lag_3',
+        'pm25_roll_3',
+        'temperature_2m_mean',
+        'precipitation_sum',
+        'wind_speed_10m_max',
+        'wind_direction_10m_dominant'
+    ]
+    features_df['predicted_pm25'] = model.predict(features_df[feature_cols])
     df = pd.merge(features_df, air_quality_df[['date','pm25','street','country']], on="date")
     df['days_before_forecast_day'] = 1
     hindcast_df = df
