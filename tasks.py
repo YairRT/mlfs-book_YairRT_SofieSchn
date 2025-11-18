@@ -232,6 +232,49 @@ def aq_train_all(c):
     pass
 
 
+@task
+def aq_batch_inference_1(c):
+    check_venv()
+    c.run('papermill notebooks/airquality/4_air_quality_batch_inference.ipynb output.ipynb \
+    -p model_number "1" \
+    -p street "edinburgh-salamander-st"')
+
+@task
+def aq_batch_inference_2(c):
+    check_venv()
+    c.run('papermill notebooks/airquality/4_air_quality_batch_inference.ipynb output.ipynb \
+    -p model_number "2" \
+    -p street "edinburgh-queensferry-road"')
+
+@task
+def aq_batch_inference_3(c):
+    check_venv()
+    c.run('papermill notebooks/airquality/4_air_quality_batch_inference.ipynb output.ipynb \
+    -p model_number "3" \
+    -p street "east-lothian-musselburgh-n-high-st"')
+
+@task
+def aq_batch_inference_4(c):
+    check_venv()
+    c.run('papermill notebooks/airquality/4_air_quality_batch_inference.ipynb output.ipynb \
+    -p model_number "4" \
+    -p street "west-lothian-broxburn"')
+
+@task
+def aq_batch_inference_5(c):
+    check_venv()
+    c.run('papermill notebooks/airquality/4_air_quality_batch_inference.ipynb output.ipynb \
+    -p model_number "5" \
+    -p street "edinburgh-st-leonards"')
+
+@task(pre=[aq_batch_inference_1, aq_batch_inference_2, aq_batch_inference_3, aq_batch_inference_4, aq_batch_inference_5])
+def aq_batch_inference_all(c):
+    """Run all air quality batch inference pipelines (1-5)."""
+    pass
+
+
+
+
 ##########################################
 # Credit Card Fraud Real-Time ML System
 ##########################################
