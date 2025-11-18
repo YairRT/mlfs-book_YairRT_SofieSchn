@@ -17,7 +17,7 @@ jobs:
       - name: checkout repo content
         uses: actions/checkout@v4
 
-        
+
       - name: setup python
         uses: actions/setup-python@v5
         with:
@@ -29,6 +29,7 @@ jobs:
       - name: Install python packages in venv
         run: |
           source .venv/bin/activate
+          export VIRTUAL_ENV=$(pwd)/.venv
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
@@ -38,7 +39,7 @@ jobs:
         run: |
           source .venv/bin/activate
           invoke aq-features-all
-          invoke aq-batch-inference_all
+          invoke aq-batch-inference-all
 
       - name: github pages publish
         uses: stefanzweifel/git-auto-commit-action@v5
